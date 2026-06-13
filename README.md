@@ -22,6 +22,8 @@ tejas uses `ffmpeg` to grab a webcam frame, averages the pixels, and calls `ddcu
 - **DDC/CI** — controls external monitors via `ddcutil setvcp 10`
 - **Backlight** — writes to `/sys/class/backlight` if present (laptops)
 - **Hysteresis** — skips update if new value is within 5% of last set value
+- **Per-display offsets** — multiply each display's target independently (useful when monitors have different base brightness)
+- **Stepped transitions** — for jumps >15%, passes through the midpoint first to reduce the perceived snap
 - **INI config** — edit anchor points in `tejas.ini`, no code changes needed
 
 ---
@@ -86,9 +88,17 @@ Config is looked up in this order:
 150 = 65
 200 = 85
 255 = 100
+
+[display-offset]
+# optional: per-display brightness multiplier (display number = multiplier)
+# display 2 will be set to 90% of whatever the computed target is
+1 = 1.0
+2 = 0.9
 ```
 
-Both sections use piecewise linear interpolation between the anchor points. Add or remove rows as needed.
+Both `[time]` and `[webcam-lumen]` use piecewise linear interpolation between anchor points. Add or remove rows as needed.
+
+`[display-offset]` is optional. Display numbers match `ddcutil detect` output. Omitting a display defaults to `1.0`.
 
 ---
 

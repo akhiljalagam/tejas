@@ -76,8 +76,19 @@ def load_display_offsets():
         return {}
     return {int(k): float(v) for k, v in cfg['display-offset'].items()}
 
+def ddcutil_set(displays, pct, offsets):
+    return [
+        subprocess.Popen(
+            ['sudo', 'ddcutil', '--display', str(d), '--noverify', 'setvcp', '10',
+             str(max(5, min(100, round(pct * offsets.get(d, 1.0)))))],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        for d in range(1, displays + 1)
+    ]
+
 def set_brightness(pct):
     pct = max(5, min(100, int(pct)))
+    cached = None
     try:
         cached = int(open(CACHE).read().strip())
         if abs(cached - pct) < 5:
@@ -85,16 +96,18 @@ def set_brightness(pct):
             return
     except Exception:
         pass
+
     n = get_display_count()
     offsets = load_display_offsets()
-    procs = [
-        subprocess.Popen(
-            ['sudo', 'ddcutil', '--display', str(d), '--noverify', 'setvcp', '10',
-             str(max(5, min(100, round(pct * offsets.get(d, 1.0)))))],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
-        for d in range(1, n + 1)
-    ]
+
+    if cached and abs(pct - cached) > 15:
+        mid = (cached + pct) // 2
+        for p in ddcutil_set(n, mid, offsets):
+            p.wait()
+
+    for p in ddcutil_set(n, pct, offsets):
+        p.wait()
+
     bl = '/sys/class/backlight'
     if os.path.isdir(bl):
         for dev in os.listdir(bl):
@@ -103,8 +116,7 @@ def set_brightness(pct):
                 open(f'{bl}/{dev}/brightness', 'w').write(str(int(pct * max_b / 100)))
             except Exception:
                 pass
-    for p in procs:
-        p.wait()
+
     open(CACHE, 'w').write(str(pct))
     print(f'  set {n} display(s) -> {pct}%')
 
