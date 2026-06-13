@@ -69,6 +69,13 @@ def brightness_from_time():
 def brightness_from_lumen(lum):
     return interpolate(load_curve('webcam-lumen'), lum)
 
+def load_display_offsets():
+    cfg = configparser.ConfigParser(inline_comment_prefixes=('#', ';'))
+    cfg.read(CONFIG)
+    if 'display-offset' not in cfg:
+        return {}
+    return {int(k): float(v) for k, v in cfg['display-offset'].items()}
+
 def set_brightness(pct):
     pct = max(5, min(100, int(pct)))
     try:
@@ -79,9 +86,11 @@ def set_brightness(pct):
     except Exception:
         pass
     n = get_display_count()
+    offsets = load_display_offsets()
     procs = [
         subprocess.Popen(
-            ['sudo', 'ddcutil', '--display', str(d), '--noverify', 'setvcp', '10', str(pct)],
+            ['sudo', 'ddcutil', '--display', str(d), '--noverify', 'setvcp', '10',
+             str(max(5, min(100, round(pct * offsets.get(d, 1.0)))))],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
         for d in range(1, n + 1)
